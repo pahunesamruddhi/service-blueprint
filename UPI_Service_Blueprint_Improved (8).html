@@ -1,0 +1,1332 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UPI Failed Debit Diagnostic Engine — Service Blueprint</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #ffffff;
+            --surface: #fafafa;
+            --border: #e5e7eb;
+            --text: #111827;
+            --text-dim: #6b7280;
+            --accent: #f97316;
+            --user: #fff7ed;
+            --cognitive: #fef3c7;
+            --front: #fff7ed;
+            --engine: #fdf2f8;
+            --back: #eff6ff;
+            --support: #ecfdf5;
+            --policy: #fef9c3;
+            --failure: #fee2e2;
+            --ops: #f3f4f6;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        .header {
+            padding: 40px 48px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 6px;
+        }
+
+        .header p {
+            color: var(--text-dim);
+        }
+
+        .badge {
+            font-family: 'JetBrains Mono';
+            font-size: 11px;
+            color: var(--accent);
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        .controls {
+            padding: 16px 48px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            gap: 12px;
+        }
+
+        .controls button {
+            font-family: 'DM Sans';
+            font-size: 13px;
+            padding: 8px 14px;
+            border: 1px solid var(--border);
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: .2s;
+        }
+
+        .controls button:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .controls button.active {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+
+        .btn-locked {
+            opacity: .4;
+            cursor: not-allowed !important;
+            position: relative;
+        }
+
+        .btn-locked:hover {
+            border-color: var(--border) !important;
+            color: var(--text) !important;
+        }
+
+        .btn-locked .lock-icon {
+            font-size: 11px;
+        }
+
+        .btn-unlocked .lock-icon {
+            display: none;
+        }
+
+        .controls-divider {
+            width: 1px;
+            background: var(--border);
+            align-self: stretch;
+            margin: 0 4px;
+        }
+
+        .btn-unlock {
+            background: #fdf2f8 !important;
+            border-color: #fbcfe8 !important;
+            color: #be185d !important;
+            font-weight: 500;
+            transition: .3s;
+        }
+
+        .btn-unlock:hover {
+            background: #fce7f3 !important;
+            border-color: #f9a8d4 !important;
+        }
+
+        .btn-unlock.used {
+            background: #ecfdf5 !important;
+            border-color: #6ee7b7 !important;
+            color: #065f46 !important;
+            cursor: pointer !important;
+        }
+
+        .btn-unlock.used:hover {
+            background: #d1fae5 !important;
+            border-color: #34d399 !important;
+        }
+
+        /* Elements hidden until solution is unlocked */
+        .solution-hidden {
+            display: none !important;
+        }
+
+        .legend {
+            display: flex;
+            gap: 20px;
+            padding: 12px 48px;
+            border-bottom: 1px solid var(--border);
+            font-size: 11px;
+            color: var(--text-dim);
+            flex-wrap: wrap;
+        }
+
+        .blueprint-container {
+            padding: 24px;
+            overflow-x: auto;
+        }
+
+        .blueprint {
+            display: grid;
+            grid-template-columns: 180px repeat(7, 260px);
+            gap: 1px;
+            background: var(--border);
+            border-radius: 10px;
+            min-width: 2020px;
+        }
+
+        .corner { background: var(--surface); }
+
+        .col-header {
+            background: var(--surface);
+            padding: 14px;
+            text-align: center;
+            font-size: 12px;
+            font-weight: 700;
+            border-bottom: 2px solid var(--accent);
+        }
+
+        .col-header span {
+            display: block;
+            font-family: 'JetBrains Mono';
+            font-size: 16px;
+            color: var(--accent);
+            opacity: .5;
+        }
+
+        .row-label {
+            padding: 16px;
+            font-weight: 700;
+            font-size: 12px;
+            border-right: 1px solid var(--border);
+            display: flex;
+            align-items: flex-start;
+            line-height: 1.4;
+        }
+
+        .cell {
+            padding: 14px;
+            font-size: 11.5px;
+            line-height: 1.6;
+            transition: .3s;
+        }
+
+        .cell-title {
+            font-weight: 700;
+            margin-bottom: 5px;
+            font-size: 11.5px;
+        }
+
+        ul { list-style: none; }
+        li { margin: 3px 0; }
+
+        .user { background: var(--user); }
+        .cognitive { background: var(--cognitive); }
+        .front { background: var(--front); }
+        .engine-row { background: var(--engine); }
+        .back { background: var(--back); }
+        .support { background: var(--support); }
+        .policy { background: var(--policy); }
+        .failure { background: var(--failure); }
+        .ops { background: var(--ops); }
+
+        .tag {
+            display: inline-block;
+            margin-top: 6px;
+            padding: 3px 8px;
+            font-size: 9px;
+            font-family: 'JetBrains Mono';
+            background: var(--surface);
+            border-radius: 4px;
+            letter-spacing: 0.5px;
+        }
+
+        .tag-gate {
+            background: #fdf2f8;
+            color: #be185d;
+            border: 1px solid #fbcfe8;
+        }
+
+        .tag-voice {
+            background: #fef3c7;
+            color: #92400e;
+            border: 1px solid #fde68a;
+        }
+
+        .tag-ml {
+            background: #ede9fe;
+            color: #6d28d9;
+            border: 1px solid #c4b5fd;
+        }
+
+        .tag-time {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+
+        .tag-mitigated {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #6ee7b7;
+            font-size: 8px;
+        }
+
+        .line {
+            grid-column: 1/-1;
+            height: 2px;
+            background: var(--accent);
+            opacity: .3;
+        }
+
+        .line-of-visibility {
+            grid-column: 1/-1;
+            height: 3px;
+            background: var(--accent);
+            opacity: .6;
+            position: relative;
+        }
+
+        .line-of-visibility::after {
+            content: 'LINE OF VISIBILITY';
+            position: absolute;
+            left: 24px;
+            top: -8px;
+            font-family: 'JetBrains Mono';
+            font-size: 8px;
+            color: var(--accent);
+            letter-spacing: 2px;
+            background: white;
+            padding: 0 8px;
+        }
+
+        .line-of-interaction {
+            grid-column: 1/-1;
+            height: 3px;
+            background: var(--accent);
+            opacity: .4;
+            position: relative;
+        }
+
+        .line-of-interaction::after {
+            content: 'LINE OF INTERNAL INTERACTION';
+            position: absolute;
+            left: 24px;
+            top: -8px;
+            font-family: 'JetBrains Mono';
+            font-size: 8px;
+            color: var(--accent);
+            letter-spacing: 2px;
+            background: white;
+            padding: 0 8px;
+        }
+
+        .footer {
+            padding: 24px 48px;
+            border-top: 1px solid var(--border);
+            font-size: 11px;
+            color: var(--text-dim);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .hidden { display: none; }
+        .dim { opacity: .38; }
+        .dim-heavy { opacity: .18; }
+
+        .highlight {
+            box-shadow: 0 0 0 2px rgba(249, 115, 22, .35);
+            transform: scale(1.01);
+        }
+
+        .ghost {
+            opacity: .4;
+            font-style: italic;
+            font-size: 11px;
+            line-height: 1.5;
+        }
+
+        .sub-split {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 6px;
+        }
+
+        .sub-card {
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            line-height: 1.5;
+        }
+
+        .sub-card-retail {
+            background: rgba(249, 115, 22, 0.08);
+            border: 1px solid rgba(249, 115, 22, 0.15);
+        }
+
+        .sub-card-sme {
+            background: rgba(59, 130, 246, 0.08);
+            border: 1px solid rgba(59, 130, 246, 0.15);
+        }
+
+        .sub-card strong {
+            display: block;
+            margin-bottom: 3px;
+            font-size: 9px;
+            letter-spacing: 1px;
+        }
+
+        .gate-sequence {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .gate-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 10.5px;
+        }
+
+        .gate-num {
+            font-family: 'JetBrains Mono';
+            font-size: 9px;
+            font-weight: 700;
+            color: #be185d;
+            background: #fdf2f8;
+            border: 1px solid #fbcfe8;
+            border-radius: 3px;
+            padding: 1px 5px;
+            min-width: 18px;
+            text-align: center;
+        }
+
+        .gate-pass {
+            font-family: 'JetBrains Mono';
+            font-size: 8px;
+            color: #065f46;
+            background: #d1fae5;
+            border-radius: 3px;
+            padding: 1px 4px;
+            margin-left: auto;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="header">
+        <span class="badge">SERVICE BLUEPRINT</span>
+        <h1>UPI Failed Debit Diagnostic Engine</h1>
+        <p>Ledger-first dispute resolution architecture — deterministic verification before conversation</p>
+    </div>
+
+    <div class="controls">
+        <button onclick="systems(this)">Systems Landscape</button>
+        <button onclick="failures(this)">Failure Points</button>
+        <button onclick="constraints(this)">Regulatory Constraints</button>
+        <button id="btn-solution" class="btn-locked" onclick="solution(this)" disabled>
+            <span class="lock-icon">🔒</span> Solution Architecture
+        </button>
+        <button onclick="resetView(this)">Reset</button>
+        <div class="controls-divider"></div>
+        <button id="btn-unlock" class="btn-unlock" onclick="toggleSolution(this)">Reveal Solution Layer</button>
+    </div>
+
+    <div class="legend">
+        <div>🧠 Cognitive State</div>
+        <div>👤 User Actions</div>
+        <div>🎙 Frontstage (Voicebot)</div>
+        <div class="solution-hidden">🔍 Diagnostic Engine</div>
+        <div>⚙ Backstage Processes</div>
+        <div>🏗 Infrastructure</div>
+        <div>📋 Policies</div>
+        <div>⚠ Failure Points</div>
+    </div>
+
+    <div class="blueprint-container">
+        <div class="blueprint">
+
+            <!-- COLUMN HEADERS -->
+            <div class="corner"></div>
+            <div class="col-header"><span>01</span>Payment Attempt</div>
+            <div class="col-header"><span>02</span>Failure Moment</div>
+            <div class="col-header"><span>03</span>Support Initiation</div>
+            <div class="col-header"><span>04</span>Authentication</div>
+            <div class="col-header"><span>05</span>Transaction Identification</div>
+            <div class="col-header"><span>06</span>Status Verification</div>
+            <div class="col-header"><span>07</span>Resolution</div>
+
+            <!-- COGNITIVE STATE ROW -->
+            <div class="row-label cognitive cog-row">User Cognitive State</div>
+
+            <div class="cell cognitive cog-row">
+                <div class="cell-title">Confident</div>
+                <ul><li>Routine transaction</li><li>Low cognitive load</li></ul>
+            </div>
+
+            <div class="cell cognitive cog-row">
+                <div class="cell-title">Alarmed</div>
+                <ul><li>Money gone, no confirmation</li><li>System 1 activating</li><li>Attention narrows</li></ul>
+            </div>
+
+            <div class="cell cognitive cog-row">
+                <div class="cell-title">Panicking — System 1</div>
+                <ul><li>Recall collapses</li><li>Can't locate UTR</li><li>Ambiguity = threat</li></ul>
+                <span class="tag">KAHNEMAN S1/S2</span>
+            </div>
+
+            <div class="cell cognitive cog-row">
+                <div class="cog-problem">
+                    <div class="cell-title">Compliant but stressed</div>
+                    <ul><li>Willing to verify identity</li><li>Needs system to lead</li><li>Patience running thin</li></ul>
+                </div>
+                <div class="cog-solution solution-hidden" style="margin-top:8px;padding:8px;border-radius:4px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);font-size:10px;line-height:1.5">
+                    <strong style="display:block;margin-bottom:3px;font-size:9px;letter-spacing:1px;color:#065f46">WITH ENGINE</strong>
+                    <span style="font-weight:700">Compliant — system is leading</span><br>
+                    OTP feels quick and purposeful<br>
+                    "Before I pull anything up, let me verify it's you"
+                </div>
+            </div>
+
+            <div class="cell cognitive cog-row">
+                <div class="cog-problem">
+                    <div class="cell-title">Frustrated — failing</div>
+                    <ul><li>Asked for 12-digit UTR</li><li>Can't find it under stress</li><li>Wrong number, dead end</li><li>System feels adversarial</li></ul>
+                </div>
+                <div class="cog-solution solution-hidden" style="margin-top:8px;padding:8px;border-radius:4px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);font-size:10px;line-height:1.5">
+                    <strong style="display:block;margin-bottom:3px;font-size:9px;letter-spacing:1px;color:#065f46">WITH ENGINE</strong>
+                    <span style="font-weight:700">Recognizing — calming</span><br>
+                    Hears own transactions read back<br>
+                    Recognition > recall<br>
+                    Cognitive load transfers to system
+                </div>
+            </div>
+
+            <div class="cell cognitive cog-row">
+                <div class="cog-problem">
+                    <div class="cell-title">Confused — unresolved</div>
+                    <ul><li>"Under reconciliation" — what does that mean?</li><li>No specific dates</li><li>Vague promises, no clarity</li><li>Trust eroding</li></ul>
+                </div>
+                <div class="cog-solution solution-hidden" style="margin-top:8px;padding:8px;border-radius:4px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);font-size:10px;line-height:1.5">
+                    <strong style="display:block;margin-bottom:3px;font-size:9px;letter-spacing:1px;color:#065f46">WITH ENGINE</strong>
+                    <span style="font-weight:700">Understanding</span><br>
+                    Hears verified status<br>
+                    Specific dates, not vague promises<br>
+                    Trust building
+                </div>
+            </div>
+
+            <div class="cell cognitive cog-row">
+                <div class="cog-problem">
+                    <div class="cell-title">Defeated — giving up</div>
+                    <ul><li>"You're #9 in queue"</li><li>15 min wait at 8:30 PM</li><li>Still at grocery store</li><li>No resolution, just escalation</li></ul>
+                </div>
+                <div class="cog-solution solution-hidden" style="margin-top:8px;padding:8px;border-radius:4px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);font-size:10px;line-height:1.5">
+                    <strong style="display:block;margin-bottom:3px;font-size:9px;letter-spacing:1px;color:#065f46">WITH ENGINE</strong>
+                    <span style="font-weight:700">Resolved with clarity</span><br>
+                    Knows exactly what happens next<br>
+                    Informed consent if SR needed
+                </div>
+            </div>
+
+            <div class="line"></div>
+
+            <!-- USER ACTIONS -->
+            <div class="row-label user user-row">User Actions</div>
+
+            <div class="cell user user-row">
+                <div class="cell-title">QR Payment</div>
+                <ul>
+                    <li>Scans QR code</li>
+                    <li>Enters amount</li>
+                    <li>Authorizes UPI PIN</li>
+                </ul>
+            </div>
+
+            <div class="cell user user-row">
+                <div class="cell-title">Failure Awareness</div>
+                <ul>
+                    <li>Debit notification appears</li>
+                    <li>Merchant receives no confirmation</li>
+                    <li>User assumes payment failed</li>
+                </ul>
+            </div>
+
+            <div class="cell user user-row">
+                <div class="cell-title">Support Call</div>
+                <ul>
+                    <li>Calls bank support line</li>
+                    <li>"Money got cut but payment didn't go through"</li>
+                </ul>
+            </div>
+
+            <div class="cell user user-row">
+                <div class="cell-title">Identity Verification</div>
+                <ul>
+                    <li>Receives OTP on phone</li>
+                    <li>Enters OTP via keypad (DTMF) or speaks it</li>
+                    <li>2 attempts max</li>
+                </ul>
+            </div>
+
+            <div class="cell user user-row">
+                <div class="cell-title">Transaction Identification</div>
+                <ul>
+                    <li>User tries to identify the failed transaction</li>
+                    <li>Thinks in events — "the one at the grocery store, 8:30 PM"</li>
+                </ul>
+                <div class="solution-hidden" style="margin-top:8px;padding:8px;border-radius:4px;background:rgba(249,115,22,0.08);border:1px solid rgba(249,115,22,0.15);font-size:10px;line-height:1.5">
+                    <strong style="display:block;margin-bottom:3px;font-size:9px;letter-spacing:1px">DESIGNED EXPERIENCE</strong>
+                    Hears last 3 transactions read aloud<br>
+                    Presses 1, 2, or 3 (DTMF) — recognition over recall<br>
+                    No open-ended voice input needed
+                </div>
+            </div>
+
+            <div class="cell user user-row">
+                <div class="cell-title">Review Status</div>
+                <ul>
+                    <li>Hears verified transaction state</li>
+                    <li>Understands refund situation with specific dates</li>
+                </ul>
+            </div>
+
+            <div class="cell user user-row">
+                <div class="cell-title">Resolution Decision</div>
+                <ul>
+                    <li>Wait for refund (in TAT)</li>
+                    <li>Confirm SR details via DTMF (Press 1 to confirm)</li>
+                    <li>Request human agent (Press 0)</li>
+                </ul>
+            </div>
+
+            <div class="line"></div>
+
+            <!-- FRONTSTAGE — VOICEBOT INTERACTION -->
+            <div class="row-label front front-row">Voicebot Interaction</div>
+
+            <div class="cell front front-row"></div>
+            <div class="cell front front-row"></div>
+
+            <div class="cell front front-row">
+                <div class="cell-title">Complaint Recognition</div>
+                <ul>
+                    <li>System recognizes failed debit complaint</li>
+                    <li>Begins verification flow</li>
+                </ul>
+                <span class="tag tag-ml">ML — INTENT ROUTING</span>
+                <span class="tag tag-voice solution-hidden">ACT FIRST, ASK SECOND</span>
+            </div>
+
+            <div class="cell front front-row">
+                <div class="cell-title">Authentication Prompt</div>
+                <ul>
+                    <li>OTP sent to registered number</li>
+                    <li>"Please enter your OTP using your keypad"</li>
+                    <li>DTMF input — avoids ASR errors on digits</li>
+                </ul>
+                <span class="tag tag-voice solution-hidden">ONE THING PER TURN</span>
+            </div>
+
+            <div class="cell front front-row">
+                <div class="cell-title">Transaction Identification</div>
+                <ul>
+                    <li>System asks user to identify the transaction</li>
+                    <li>User is in System 1 — recall is compromised</li>
+                </ul>
+                <div class="solution-hidden" style="margin-top:8px;padding:8px;border-radius:4px;background:rgba(249,115,22,0.08);border:1px solid rgba(249,115,22,0.15);font-size:10px;line-height:1.5">
+                    <strong style="display:block;margin-bottom:3px;font-size:9px;letter-spacing:1px">DESIGNED SOLUTION</strong>
+                    Reads last 3 transactions aloud<br>
+                    "Press 1 for ₹1,200 at FreshMart, 8:30 PM"<br>
+                    DTMF selection — precise, no ASR ambiguity<br>
+                    Fallback: date + amount prompt → retry → agent
+                </div>
+            </div>
+
+            <div class="cell front front-row">
+                <div class="cell-title">Status Communication</div>
+                <ul>
+                    <li>System communicates transaction status to user</li>
+                    <li>User needs clarity on what happened and what's next</li>
+                </ul>
+                <div class="solution-hidden" style="margin-top:8px;padding:8px;border-radius:4px;background:rgba(249,115,22,0.08);border:1px solid rgba(249,115,22,0.15);font-size:10px;line-height:1.5">
+                    <strong style="display:block;margin-bottom:3px;font-size:9px;letter-spacing:1px">DESIGNED SOLUTION</strong>
+                    Specific state, specific dates<br>
+                    "Refund expected by [date]"<br>
+                    No vague promises — compliance floor only
+                </div>
+                <span class="tag tag-voice solution-hidden">RESTRICTIONS = PROTECTION</span>
+            </div>
+
+            <div class="cell front front-row">
+                <div class="cell-title">Resolution</div>
+                <ul>
+                    <li>User receives outcome or is escalated</li>
+                    <li>Conversation ends or service request created</li>
+                </ul>
+                <div class="solution-hidden" style="margin-top:8px;padding:8px;border-radius:4px;background:rgba(249,115,22,0.08);border:1px solid rgba(249,115,22,0.15);font-size:10px;line-height:1.5">
+                    <strong style="display:block;margin-bottom:3px;font-size:9px;letter-spacing:1px">DESIGNED SOLUTION</strong>
+                    Refund credited → inform + close<br>
+                    In TAT → inform + offer agent<br>
+                    Out of TAT → restate details → "Press 1 to confirm"<br>
+                    DTMF for SR consent — no ambiguous "yes"<br>
+                    <span style="margin-top:4px;display:block;opacity:.7">SR shows: Merchant · Amount · Date · UTR</span>
+                </div>
+            </div>
+
+            <div class="line-of-visibility"></div>
+
+            <!-- DIAGNOSTIC ENGINE ROW -->
+            <div class="row-label engine-row eng-row">
+                <div>
+                    <span class="eng-after-label" style="font-family:'JetBrains Mono';font-size:8px;letter-spacing:2px;color:#065f46;display:none;margin-bottom:4px">✓ AFTER</span>
+                    Diagnostic Engine<br><span style="font-weight:400;font-size:10px;color:var(--text-dim)">Five-gate verification</span>
+                </div>
+            </div>
+
+            <div class="cell engine-row eng-row eng-inactive" style="opacity:.3;font-style:italic;font-size:10px;color:var(--text-dim)">Engine not active</div>
+            <div class="cell engine-row eng-row eng-inactive" style="opacity:.3;font-style:italic;font-size:10px;color:var(--text-dim)">Engine not active</div>
+            <div class="cell engine-row eng-row eng-inactive" style="opacity:.3;font-style:italic;font-size:10px;color:var(--text-dim)">Engine not active</div>
+            <div class="cell engine-row eng-row eng-inactive" style="opacity:.3;font-style:italic;font-size:10px;color:var(--text-dim)">Engine not active</div>
+
+            <div class="cell engine-row eng-row eng-active">
+                <div class="cell-title">Gates 1–2 fire</div>
+                <div class="gate-sequence">
+                    <div class="gate-item">
+                        <span class="gate-num">G1</span>
+                        Debit confirmed?
+                        <span class="gate-pass">CAN RESOLVE</span>
+                    </div>
+                    <div class="gate-item">
+                        <span class="gate-num">G2</span>
+                        Channel identified? (UPI / card / mandate / subscription)
+                    </div>
+                </div>
+                <span class="tag tag-gate" style="margin-top:8px">LEDGER-FIRST</span>
+            </div>
+
+            <div class="cell engine-row eng-row eng-active">
+                <div class="cell-title">Gates 3–4 fire</div>
+                <div class="gate-sequence">
+                    <div class="gate-item">
+                        <span class="gate-num">G3</span>
+                        Transaction status — right now?
+                        <span class="gate-pass">CAN RESOLVE</span>
+                    </div>
+                    <div class="gate-item">
+                        <span class="gate-num">G4</span>
+                        Refund already credited?
+                        <span class="gate-pass">CAN RESOLVE</span>
+                    </div>
+                </div>
+                <span class="tag tag-gate" style="margin-top:8px">GHOST TICKET KILLER</span>
+            </div>
+
+            <div class="cell engine-row eng-row eng-active">
+                <div class="cell-title">Gate 5 fires</div>
+                <div class="gate-sequence">
+                    <div class="gate-item">
+                        <span class="gate-num">G5</span>
+                        TAT elapsed? Regulatory window closed?
+                        <span class="gate-pass">CAN RESOLVE</span>
+                    </div>
+                </div>
+                <ul style="margin-top:8px">
+                    <li>All 5 pass → SR can be offered</li>
+                    <li>Any gate resolves → no SR created</li>
+                </ul>
+                <span class="tag tag-gate" style="margin-top:8px">FINAL GATE — DETERMINISTIC</span>
+            </div>
+
+            <div class="line-of-interaction"></div>
+
+            <!-- BACKSTAGE -->
+            <div class="row-label back back-row">Backstage Processes</div>
+
+            <div class="cell back back-row">
+                <div class="cell-title">UPI Transaction Lifecycle</div>
+                <ul>
+                    <li>Payment initiated via PSP</li>
+                    <li>Routed through NPCI switch</li>
+                    <li>Beneficiary bank acknowledgement</li>
+                </ul>
+            </div>
+
+            <div class="cell back back-row">
+                <div class="cell-title">Settlement State Split</div>
+                <ul>
+                    <li>Notification fires before settlement</li>
+                    <li>4 possible states invisible to user</li>
+                    <li>UDIR auto-reversal may already be in motion</li>
+                </ul>
+            </div>
+
+            <div class="cell back back-row">
+                <div class="cell-title">Intent Classification</div>
+                <ul>
+                    <li>ML routes to failed debit flow</li>
+                    <li>Broad intent only — not escalation decision</li>
+                </ul>
+                <span class="tag tag-ml">ML BOUNDARY</span>
+            </div>
+
+            <div class="cell back back-row">
+                <div class="cell-title">Session + Auth Validation</div>
+                <ul>
+                    <li>OTP verification against registered number</li>
+                    <li>Secure session created</li>
+                    <li>No data surfaced before verification</li>
+                </ul>
+            </div>
+
+            <div class="cell back back-row">
+                <div class="cell-title">Ledger Query</div>
+                <ul>
+                    <li>Retrieve last 3 transactions</li>
+                    <li>Identify payment channel</li>
+                    <li>Match selected transaction to ledger record</li>
+                </ul>
+                <span class="tag tag-gate solution-hidden">GATES 1-2 DATA SOURCE</span>
+            </div>
+
+            <div class="cell back back-row">
+                <div class="cell-title">State Verification</div>
+                <ul>
+                    <li>Real-time ledger status check</li>
+                    <li>UDIR reversal status query</li>
+                    <li>Refund credit confirmation</li>
+                    <li>TAT window calculation</li>
+                </ul>
+                <span class="tag tag-gate solution-hidden">GATES 3-5 DATA SOURCE</span>
+            </div>
+
+            <div class="cell back back-row">
+                <div class="cell-title">SR Processing</div>
+                <ul>
+                    <li>Duplicate SR detection</li>
+                    <li>Eligibility verified against ledger state</li>
+                    <li>API call → SR# generated</li>
+                    <li>API fail → agent transfer</li>
+                </ul>
+                <span class="tag tag-gate solution-hidden">ALL 5 GATES MUST PASS</span>
+            </div>
+
+            <div class="line"></div>
+
+            <!-- SUPPORT SYSTEMS -->
+            <div class="row-label support support-row">Infrastructure</div>
+
+            <div class="cell support support-row">
+                <div class="cell-title">UPI Payment Rail</div>
+                <ul>
+                    <li>PSP app (PhonePe, GPay, etc.)</li>
+                    <li>Issuer / acquirer banks</li>
+                </ul>
+            </div>
+
+            <div class="cell support support-row">
+                <div class="cell-title">NPCI Network</div>
+                <ul>
+                    <li>UPI switch routing</li>
+                    <li>Interbank settlement</li>
+                    <li>UDIR dispute system</li>
+                </ul>
+            </div>
+
+            <div class="cell support support-row">
+                <div class="cell-title">Voicebot Platform</div>
+                <ul>
+                    <li>Automatic Speech Recognition (ASR)</li>
+                    <li>DTMF keypad input for structured data</li>
+                    <li>NLU — intent classification</li>
+                    <li>Dialogue manager</li>
+                </ul>
+            </div>
+
+            <div class="cell support support-row">
+                <div class="cell-title">Auth Infrastructure</div>
+                <ul>
+                    <li>OTP delivery system</li>
+                    <li>Session management</li>
+                    <li>Session timeout: 15 min</li>
+                </ul>
+            </div>
+
+            <div class="cell support support-row">
+                <div class="cell-title">Core Banking Ledger</div>
+                <ul>
+                    <li>Transaction records</li>
+                    <li>Account balance</li>
+                    <li>Refund status</li>
+                </ul>
+            </div>
+
+            <div class="cell support support-row">
+                <div class="cell-title">NPCI + UDIR</div>
+                <ul>
+                    <li>Settlement confirmation APIs</li>
+                    <li>Auto-reversal status</li>
+                    <li>TAT rule engine</li>
+                </ul>
+            </div>
+
+            <div class="cell support support-row">
+                <div class="cell-title">Case Management</div>
+                <ul>
+                    <li>SR creation API</li>
+                    <li>Duplicate detection</li>
+                    <li>SMS notifications</li>
+                    <li>Agent transfer routing</li>
+                </ul>
+            </div>
+
+            <div class="line"></div>
+
+            <!-- POLICIES -->
+            <div class="row-label policy policy-row">Policies &amp; Constraints</div>
+
+            <div class="cell policy policy-row policy-empty" style="opacity:.3;font-style:italic;font-size:10px;color:var(--text-dim)">No policy constraint</div>
+            <div class="cell policy policy-row policy-empty" style="opacity:.3;font-style:italic;font-size:10px;color:var(--text-dim)">No policy constraint</div>
+
+            <div class="cell policy policy-row">
+                <div class="cell-title">Classification Boundary</div>
+                <ul>
+                    <li>ML for intent routing only</li>
+                    <li>Escalation gating → ledger verification</li>
+                    <li>Classification confidence ≠ SR eligibility</li>
+                </ul>
+            </div>
+
+            <div class="cell policy policy-row">
+                <div class="cell-title">Data Privacy</div>
+                <ul>
+                    <li>No transaction data before OTP verification</li>
+                    <li>Session timeout enforced</li>
+                </ul>
+            </div>
+
+            <div class="cell policy policy-row">
+                <div class="cell-title">Verification Rule</div>
+                <ul>
+                    <li>Ledger verification required before any escalation</li>
+                    <li>SR creation requires verified transaction state</li>
+                </ul>
+                <span class="tag tag-gate solution-hidden">NO SR WITHOUT ALL 5 GATES PASSING</span>
+            </div>
+
+            <div class="cell policy policy-row">
+                <div class="cell-title">NPCI Refund Rules</div>
+                <ul>
+                    <li>P2P → T+1 business day</li>
+                    <li>Merchant → T+5 business days</li>
+                    <li>₹100/day penalty for delay</li>
+                    <li>No predictive ETAs — compliance floor only</li>
+                </ul>
+            </div>
+
+            <div class="cell policy policy-row">
+                <div class="cell-title">Escalation Policy</div>
+                <ul>
+                    <li>No SR within active TAT window</li>
+                    <li>Explicit user consent before SR creation</li>
+                    <li>Duplicate SR blocked</li>
+                    <li>Every path has agent fallback</li>
+                </ul>
+            </div>
+
+            <div class="line"></div>
+
+            <!-- FAILURE POINTS -->
+            <div class="row-label failure failure-row">Failure Points</div>
+
+            <div class="cell failure failure-row failure-empty" style="opacity:.3;font-style:italic;font-size:10px;color:var(--text-dim)">No failure point</div>
+
+            <div class="cell failure failure-row">
+                <div class="cell-title">Perception Gap</div>
+                <ul>
+                    <li>User sees debit notification</li>
+                    <li>Merchant sees no payment</li>
+                    <li>4 possible states, 1 visible signal</li>
+                </ul>
+                <span class="tag tag-mitigated solution-hidden">→ MITIGATED BY COL 06: verified status communicated</span>
+            </div>
+
+            <div class="cell failure failure-row">
+                <div class="cell-title">Language Ambiguity</div>
+                <ul>
+                    <li>"Money got cut" = 4 transaction types</li>
+                    <li>Labelers can't distinguish from text alone</li>
+                    <li>Language encodes perception, not fact</li>
+                </ul>
+                <span class="tag tag-mitigated solution-hidden">→ MITIGATED BY ENGINE: ledger classifies, not language</span>
+            </div>
+
+            <div class="cell failure failure-row">
+                <div class="cell-title">Channel-Specific Risk</div>
+                <ul>
+                    <li>ASR mishears digits, amounts, confirmations</li>
+                    <li>Open-ended voice input unreliable for structured data</li>
+                    <li>Background noise at merchant locations</li>
+                </ul>
+                <span class="tag tag-mitigated solution-hidden">→ MITIGATED: DTMF for all structured input — OTP, selection, confirmation</span>
+            </div>
+
+            <div class="cell failure failure-row">
+                <div class="cell-title">Cognitive Constraint</div>
+                <ul>
+                    <li>User cannot recall UTR under stress</li>
+                    <li>System asks hardest question at worst moment</li>
+                </ul>
+                <span class="tag tag-mitigated solution-hidden">→ MITIGATED BY COL 05: recognition over recall</span>
+            </div>
+
+            <div class="cell failure failure-row">
+                <div class="cell-title">Status Mismatch</div>
+                <ul>
+                    <li>UPI app vs bank vs NPCI — different states</li>
+                    <li>Asynchronous — state may change mid-conversation</li>
+                </ul>
+                <span class="tag tag-mitigated solution-hidden">→ MITIGATED BY GATE 3: real-time ledger re-check</span>
+            </div>
+
+            <div class="cell failure failure-row">
+                <div class="cell-title">Operational Risk</div>
+                <ul>
+                    <li>Premature SR creation</li>
+                    <li>Duplicate SRs</li>
+                    <li>Audit exposure from unverified escalation</li>
+                </ul>
+                <span class="tag tag-mitigated solution-hidden">→ MITIGATED BY GATE 5 + duplicate detection</span>
+            </div>
+
+            <div class="line"></div>
+
+            <!-- LEGACY / GHOST OPS -->
+            <div class="row-label ops ops-row hidden" style="position:relative">
+                <span style="font-family:'JetBrains Mono';font-size:8px;letter-spacing:2px;color:#991b1b;display:block;margin-bottom:4px">⊘ BEFORE</span>
+                Legacy Path<br>
+                <span style="font-weight:400;font-size:10px;color:var(--text-dim)">What the engine replaces</span>
+            </div>
+
+            <div class="cell ops ops-row hidden ghost">
+                <div class="cell-title" style="font-style:normal">User complaint</div>
+                "Money got cut"<br>
+                Language taken at face value
+            </div>
+            <div class="cell ops ops-row hidden ghost">
+                <div class="cell-title" style="font-style:normal">Voicebot asks for UTR</div>
+                "Please provide your 12-digit reference number"<br>
+                User can't recall it<br>
+                Repeated prompts
+                <span class="tag tag-time">FAILURE POINT</span>
+            </div>
+            <div class="cell ops ops-row hidden ghost">
+                <div class="cell-title" style="font-style:normal">Agent queue</div>
+                User gives up on voicebot<br>
+                "You're #9 in queue"<br>
+                15 min hold at 8:30 PM
+                <span class="tag tag-time">USER FRUSTRATION</span>
+            </div>
+            <div class="cell ops ops-row hidden ghost">
+                <div class="cell-title" style="font-style:normal">SR created blind</div>
+                No ledger verification<br>
+                Language-based classification<br>
+                May be ghost ticket
+            </div>
+            <div class="cell ops ops-row hidden ghost">
+                <div class="cell-title" style="font-style:normal">Ops investigation</div>
+                Ops pulls ledger record<br>
+                Checks NPCI settlement<br>
+                Confirms refund status
+                <span class="tag tag-time">3–5 WORKING DAYS</span>
+            </div>
+            <div class="cell ops ops-row hidden ghost">
+                <div class="cell-title" style="font-style:normal">Discovery</div>
+                Money already reversed<br>
+                Investigation was unnecessary<br>
+                Compliance hours wasted
+            </div>
+            <div class="cell ops ops-row hidden ghost">
+                <div class="cell-title" style="font-style:normal">Case closed</div>
+                No action required<br>
+                Ghost ticket logged<br>
+                Audit trail created for nothing
+                <span class="tag tag-time">TOTAL: DAYS → ENGINE: &lt;30s</span>
+            </div>
+
+        </div>
+    </div>
+
+    <div class="footer">
+        <span>UPI Failed Debit Diagnostic Engine — Service Blueprint</span>
+        <span>Ledger-First Verification · Deterministic Escalation · Compliance-Aligned Resolution</span>
+    </div>
+
+    <script>
+        let solutionUnlocked = false;
+
+        function clearActive() {
+            document.querySelectorAll('.controls button:not(#btn-unlock)').forEach(b => b.classList.remove('active'));
+        }
+
+        function walkRowCols(rowClass, callback) {
+            const labels = document.querySelectorAll('.row-label.' + rowClass);
+            labels.forEach(function(label) {
+                var cur = label.nextElementSibling;
+                for (var col = 1; col <= 7; col++) {
+                    if (!cur) break;
+                    while (cur && (cur.classList.contains('line') || cur.classList.contains('line-of-visibility') || cur.classList.contains('line-of-interaction'))) {
+                        cur = cur.nextElementSibling;
+                    }
+                    if (!cur) break;
+                    callback(cur, col);
+                    cur = cur.nextElementSibling;
+                }
+            });
+        }
+
+        function hideSolutionLayer() {
+            solutionUnlocked = false;
+            var solBtn = document.getElementById('btn-solution');
+            solBtn.classList.add('btn-locked');
+            solBtn.classList.remove('btn-unlocked', 'active');
+            solBtn.disabled = true;
+
+            var unlockBtn = document.getElementById('btn-unlock');
+            unlockBtn.classList.remove('used');
+            unlockBtn.disabled = false;
+            unlockBtn.textContent = 'Reveal Solution Layer';
+
+            document.querySelectorAll('.solution-revealed').forEach(function(el) {
+                el.classList.remove('solution-revealed');
+                el.classList.add('solution-hidden');
+            });
+
+            document.querySelectorAll('.eng-row').forEach(function(el) { el.classList.add('hidden'); });
+            document.querySelectorAll('.ops-row').forEach(function(el) { el.classList.add('hidden'); });
+            document.querySelectorAll('.line-of-interaction').forEach(function(el) { el.classList.add('hidden'); });
+            document.querySelectorAll('.eng-after-label').forEach(function(el) { el.style.display = 'none'; });
+        }
+
+        function showSolutionLayer() {
+            solutionUnlocked = true;
+            var solBtn = document.getElementById('btn-solution');
+            solBtn.classList.remove('btn-locked');
+            solBtn.classList.add('btn-unlocked');
+            solBtn.disabled = false;
+
+            var unlockBtn = document.getElementById('btn-unlock');
+            unlockBtn.classList.add('used');
+            unlockBtn.textContent = 'Hide Solution Layer';
+            unlockBtn.disabled = false;
+
+            document.querySelectorAll('.solution-hidden').forEach(function(el) {
+                el.classList.remove('solution-hidden');
+                el.classList.add('solution-revealed');
+            });
+        }
+
+        function toggleSolution(btn) {
+            if (solutionUnlocked) {
+                hideSolutionLayer();
+                systems(document.querySelector('.controls button'));
+            } else {
+                showSolutionLayer();
+                solution(document.getElementById('btn-solution'));
+            }
+        }
+
+        function softReset() {
+            document.querySelectorAll('.cell, .row-label, .col-header').forEach(function(c) {
+                c.classList.remove('dim', 'dim-heavy', 'highlight');
+            });
+            document.querySelectorAll('.ops-row').forEach(function(el) { el.classList.add('hidden'); });
+            document.querySelectorAll('.eng-after-label').forEach(function(el) { el.style.display = 'none'; });
+
+            if (solutionUnlocked) {
+                document.querySelectorAll('.policy-row, .failure-row, .cog-row, .eng-row').forEach(function(el) { el.classList.remove('hidden'); });
+                document.querySelectorAll('.line-of-visibility, .line-of-interaction').forEach(function(el) { el.classList.remove('hidden'); });
+            } else {
+                document.querySelectorAll('.policy-row, .failure-row, .cog-row').forEach(function(el) { el.classList.remove('hidden'); });
+                document.querySelectorAll('.eng-row').forEach(function(el) { el.classList.add('hidden'); });
+                document.querySelectorAll('.line-of-visibility').forEach(function(el) { el.classList.remove('hidden'); });
+                document.querySelectorAll('.line-of-interaction').forEach(function(el) { el.classList.add('hidden'); });
+            }
+        }
+
+        function resetView(btn) {
+            if (solutionUnlocked) {
+                hideSolutionLayer();
+            }
+            clearActive();
+            softReset();
+        }
+
+        function systems(btn) {
+            softReset();
+            clearActive();
+            if (btn) btn.classList.add('active');
+
+            // Show cognitive state — it frames the human context for the system
+            // Hide policy, failure rows (those are Acts 2-3)
+            document.querySelectorAll('.policy-row, .failure-row').forEach(function(el) { el.classList.add('hidden'); });
+            document.querySelectorAll('.ops-row').forEach(function(el) { el.classList.add('hidden'); });
+
+            if (solutionUnlocked) {
+                document.querySelectorAll('.eng-row').forEach(function(el) { el.classList.remove('hidden'); });
+                document.querySelectorAll('.eng-row .cell').forEach(function(el) { el.classList.add('dim'); });
+                document.querySelectorAll('.line-of-visibility, .line-of-interaction').forEach(function(el) { el.classList.remove('hidden'); });
+            } else {
+                document.querySelectorAll('.eng-row').forEach(function(el) { el.classList.add('hidden'); });
+                document.querySelectorAll('.line-of-interaction').forEach(function(el) { el.classList.add('hidden'); });
+            }
+        }
+
+        function failures(btn) {
+            softReset();
+            clearActive();
+            if (btn) btn.classList.add('active');
+
+            document.querySelectorAll('.eng-row, .policy-row').forEach(function(el) { el.classList.add('hidden'); });
+            document.querySelectorAll('.line-of-visibility, .line-of-interaction').forEach(function(el) { el.classList.add('hidden'); });
+            document.querySelectorAll('.ops-row').forEach(function(el) { el.classList.add('hidden'); });
+
+            document.querySelectorAll('.cell').forEach(function(c) { c.classList.add('dim'); });
+            document.querySelectorAll('.row-label').forEach(function(c) { c.classList.add('dim'); });
+
+            document.querySelectorAll('.failure:not(.failure-empty)').forEach(function(el) {
+                el.classList.remove('dim', 'hidden');
+                el.classList.add('highlight');
+            });
+            document.querySelectorAll('.failure-row.row-label').forEach(function(el) { el.classList.remove('dim'); });
+            document.querySelectorAll('.failure-empty').forEach(function(el) {
+                el.classList.remove('highlight');
+                el.classList.add('dim');
+            });
+            document.querySelectorAll('.cog-row.row-label').forEach(function(el) { el.classList.remove('dim'); });
+        }
+
+        function constraints(btn) {
+            softReset();
+            clearActive();
+            if (btn) btn.classList.add('active');
+
+            document.querySelectorAll('.cog-row, .eng-row').forEach(function(el) { el.classList.add('hidden'); });
+            document.querySelectorAll('.line-of-visibility, .line-of-interaction').forEach(function(el) { el.classList.add('hidden'); });
+
+            document.querySelectorAll('.cell').forEach(function(c) { c.classList.add('dim'); });
+            document.querySelectorAll('.row-label').forEach(function(c) { c.classList.add('dim'); });
+
+            document.querySelectorAll('.policy-row:not(.policy-empty)').forEach(function(c) {
+                c.classList.remove('dim', 'hidden');
+                c.classList.add('highlight');
+            });
+            document.querySelectorAll('.policy-empty').forEach(function(el) {
+                el.classList.remove('highlight');
+                el.classList.add('dim');
+            });
+            document.querySelectorAll('.policy-row.row-label').forEach(function(el) { el.classList.remove('dim'); });
+            document.querySelectorAll('.failure-row.row-label').forEach(function(el) { el.classList.remove('dim'); });
+        }
+
+        function solution(btn) {
+            if (!solutionUnlocked) return;
+
+            softReset();
+            clearActive();
+            if (btn) btn.classList.add('active');
+
+            // reveal legacy path, hide cognitive row
+            document.querySelectorAll('.ops-row').forEach(function(el) { el.classList.remove('hidden'); });
+            document.querySelectorAll('.cog-row').forEach(function(el) { el.classList.add('hidden'); });
+
+            // dim everything as baseline
+            document.querySelectorAll('.cell').forEach(function(el) { el.classList.add('dim'); });
+            document.querySelectorAll('.row-label').forEach(function(el) { el.classList.add('dim'); });
+
+            // col headers: highlight 05-07, un-dim 03-04, heavy-dim 01-02
+            document.querySelectorAll('.col-header').forEach(function(header) {
+                var text = header.textContent || '';
+                if (text.includes('Transaction Identification') || text.includes('Status Verification') || text.includes('Resolution')) {
+                    header.classList.add('highlight');
+                } else if (text.includes('Support Initiation') || text.includes('Authentication')) {
+                    // cols 03-04: solution principles live here too
+                    header.classList.remove('dim');
+                } else {
+                    header.classList.add('dim');
+                }
+            });
+
+            // ENGINE ROW: highlight active cells (05-07), heavy-dim inactive (01-04)
+            document.querySelectorAll('.eng-active').forEach(function(el) {
+                el.classList.remove('dim');
+                el.classList.add('highlight');
+            });
+            document.querySelectorAll('.eng-inactive').forEach(function(el) {
+                el.classList.add('dim-heavy');
+                el.classList.remove('highlight');
+            });
+            document.querySelectorAll('.eng-row.row-label').forEach(function(el) { el.classList.remove('dim'); });
+            document.querySelectorAll('.eng-after-label').forEach(function(el) { el.style.display = 'block'; });
+
+            // FRONTSTAGE: highlight cols 03-07 (voice principles in 03-04, designed solutions in 05-07)
+            walkRowCols('front-row', function(cell, col) {
+                if (col >= 3 && col <= 7) {
+                    cell.classList.remove('dim');
+                    cell.classList.add('highlight');
+                }
+            });
+            document.querySelectorAll('.row-label.front-row').forEach(function(el) { el.classList.remove('dim'); });
+
+            // BACKSTAGE: highlight cols 03-07 (ML boundary in 03, auth in 04, gates in 05-07)
+            walkRowCols('back-row', function(cell, col) {
+                if (col >= 3 && col <= 7) {
+                    cell.classList.remove('dim');
+                    cell.classList.add('highlight');
+                }
+            });
+            document.querySelectorAll('.row-label.back-row').forEach(function(el) { el.classList.remove('dim'); });
+
+            // USER ACTIONS: un-dim cols 03-07 for context (col 05 has designed experience card)
+            walkRowCols('user-row', function(cell, col) {
+                if (col >= 3 && col <= 7) {
+                    cell.classList.remove('dim');
+                }
+            });
+            document.querySelectorAll('.row-label.user-row').forEach(function(el) { el.classList.remove('dim'); });
+
+            // INFRASTRUCTURE: highlight cols 03-07
+            walkRowCols('support-row', function(cell, col) {
+                if (col >= 3 && col <= 7) {
+                    cell.classList.remove('dim');
+                    cell.classList.add('highlight');
+                }
+            });
+            document.querySelectorAll('.row-label.support-row').forEach(function(el) { el.classList.remove('dim'); });
+
+            // POLICY: highlight cols 03-07 (skip empty cols 01-02)
+            walkRowCols('policy-row', function(cell, col) {
+                if (col >= 3 && col <= 7) {
+                    cell.classList.remove('dim');
+                    cell.classList.add('highlight');
+                }
+            });
+            document.querySelectorAll('.row-label.policy-row').forEach(function(el) { el.classList.remove('dim'); });
+
+            // FAILURE ROW: un-dim to show mitigation tags (now visible via solution-revealed)
+            document.querySelectorAll('.failure:not(.failure-empty)').forEach(function(el) {
+                el.classList.remove('dim');
+            });
+            document.querySelectorAll('.failure-row.row-label').forEach(function(el) { el.classList.remove('dim'); });
+
+            // LEGACY PATH: fully visible for before/after comparison
+            document.querySelectorAll('.ops-row.row-label').forEach(function(el) { el.classList.remove('dim'); });
+            document.querySelectorAll('.ops-row.cell').forEach(function(el) { el.classList.remove('dim'); });
+
+            // keep structural lines visible
+            document.querySelectorAll('.line-of-visibility, .line-of-interaction').forEach(function(el) { el.classList.remove('hidden'); });
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.eng-row').forEach(function(el) { el.classList.add('hidden'); });
+            document.querySelectorAll('.line-of-interaction').forEach(function(el) { el.classList.add('hidden'); });
+            var sysBtn = document.querySelector('.controls button');
+            systems(sysBtn);
+        });
+    </script>
+
+</body>
+</html>
